@@ -1,30 +1,67 @@
-# Skill Echo — Build Plan (Nov 19 → Nov 30, 2026)
+# Skill Echo — Build Plan
 
-Source: our idea doc (app.pdf) + official rules (firebasehybridaihackathon.devpost.com/rules).
+**Watch. Practice. Get corrected. Master it.**
+Upload or record an instructional video → cloud Gemini turns it into an interactive, step-by-step
+skill → the learner starts **Live Coach**, the phone camera watches the work, and **Gemini Nano 4
+on-device** checks each checkpoint, speaks warnings about mistakes, and keeps working offline.
 
-## What the judges need (from the official rules)
+We build continuously, step by step. Each step = one branch → PR → developer says "okay" → merge
+to `master`. Do not start the next step until the current one builds and works on a real phone.
+
+## Quality bar (applies to every step)
+We are building a **finished, premium product**, not a tech demo. Judges score Design and
+Technological Implementation equally with Impact and Idea.
+
+**Design**
+- Distinct visual identity: custom Material 3 theme (own color scheme, typography scale, shapes),
+  not the default purple template. Light + dark mode.
+- Every screen designed before coding (Claude proposes layout + states; Figma optional).
+- Every screen has all states done: loading (skeletons / progress with real stage text),
+  empty, error with a retry action, success.
+- Motion with purpose: animated step transitions, checkpoint "verified" feedback, warning
+  pulse on the camera overlay, smooth navigation transitions.
+- Live Coach is the hero screen: full-bleed camera, clear step card, large readable status,
+  inference badge (ON-DEVICE / CLOUD), big touch targets usable with dirty/busy hands.
+- Accessibility: content descriptions, 48dp targets, contrast AA, works with TalkBack,
+  font scaling; spoken feedback via TextToSpeech.
+- Onboarding that explains the camera setup (tripod, framing) and privacy mode in 2–3 screens.
+
+**Functionality**
+- Real AI only, real inference source shown, honest errors.
+- Never crashes on bad model output, no network, denied permissions, or missing Nano model.
+- Fast and smooth: no work on the main thread, one AI request in flight, camera never freezes.
+- Works offline for coaching once a lesson is saved.
+- Unit tests for parsing, routing, and the coach decision logic.
+
+## Contest requirements (from the official rules)
 - Android app using **Gemini Nano 4 via Firebase AI Logic**, with **App Check** (debug tokens OK).
 - Other Firebase products encouraged: Firestore, Auth, Remote Config.
-- Repo public on GitHub, **open-source LICENSE file** (Apache preferred), all source + setup
-  instructions, Firebase AI Logic actually imported **and called** at runtime.
-- **YouTube demo ≤ 3 min**, English, shows the app really running.
-- Text description: how we used Firebase AI Logic, features, value proposition, what we built
-  during the contest.
-- Free test build (APK) for judges. No production keys / PII in repo or instructions.
-- All team members added to the Devpost project.
-- Submit by **Nov 30, 2:00 PM PT**. Commits after that are not evaluated.
-- Judged equally on: Technological implementation (hybrid inference!), Design (complete
-  product, not a demo), Potential impact, Quality of idea.
+- Public GitHub repo, open-source LICENSE (Apache) visible in About, all source + setup
+  instructions; Firebase AI Logic must be imported **and called** at runtime.
+- Public YouTube demo ≤ 3 minutes, English, showing the app really running.
+- Text description: how we use Firebase AI Logic, features, value proposition.
+- Free test build (APK) for judges. No production keys or personal data in repo.
+- Both team members added to the Devpost project.
+- Judging (equal weight): Technological implementation (hybrid inference), Design (complete
+  product), Potential impact, Quality of idea.
+
+## Libraries & versions
+- Do **not** copy versions from the idea PDF. When adding a library, take the current stable
+  version from the official docs (Firebase Android setup / Firebase AI Logic hybrid guide,
+  Android Developers) and add it to `gradle/libs.versions.toml`.
+- Use the **Firebase BoM** for Firebase libraries. The on-device AI library is experimental:
+  follow the official hybrid inference guide exactly for its artifact and version.
+- Once a version works, it is pinned. Upgrades only with both developers' agreement.
 
 ## Scope
-**Core (must ship):** video → lesson via cloud Gemini · review/edit lesson · Live Coach camera
-with automatic Nano checkpoint checks · spoken warnings (TTS) · offline coaching · consent-based
-cloud fallback · inference-source badge · App Check.
-**Include if time:** YouTube URL, record video in-app (local file upload comes first),
-Firestore sync + anonymous Auth.
-**Not now:** Gemini Live streaming, marketplace, iOS/Web, accounts/history beyond simple.
+**Core:** video → lesson via cloud Gemini · review/edit lesson · Live Coach camera with automatic
+Nano checkpoint checks · spoken warnings · offline coaching · consent-based cloud fallback ·
+inference-source badge · App Check · polished UI on every screen.
+**Also in:** local video upload, YouTube URL, in-app recording, session summary, simple anonymous
+Auth + Firestore sync.
+**Later (only if everything above is excellent):** Gemini Live streaming, marketplace, iOS/Web.
 
-## AI routing (one place: `InferenceRouter`)
+## AI routing (single place: `InferenceRouter`)
 | Operation | Mode |
 |---|---|
 | Analyze expert video, generate lesson | `ONLY_IN_CLOUD` |
@@ -32,6 +69,9 @@ Firestore sync + anonymous Auth.
 | Live checkpoint, hybrid mode (user opted in) | `PREFER_ON_DEVICE` |
 | "Detailed review" button | `ONLY_IN_CLOUD` |
 | Short offline question about a step | `ONLY_ON_DEVICE` |
+
+Privacy: private mode never uploads frames — if Nano is unavailable, show "Local AI unavailable".
+Hybrid mode asks for consent before the first cloud use.
 
 ## Shared data contract (`domain/model/`) — agree before splitting work
 ```kotlin
@@ -47,82 +87,88 @@ enum class CheckStatus { CORRECT, POSSIBLE_ERROR, UNCERTAIN }
 ```
 Cloud Gemini returns `Skill` JSON (use a response schema). Nano returns `CheckResult` JSON.
 
-## Milestones (each = one branch → PR → developer says "okay" → merge to master)
+## Screens
+1. **Onboarding** — what Skill Echo does, camera setup tips, privacy mode choice.
+2. **Home** — continue lesson, saved skills (available offline), create new.
+3. **Create Skill** — YouTube link / upload video / record video; staged progress
+   ("Uploading → Watching video → Building steps").
+4. **Review Lesson** — edit steps, expected visuals, common mistakes; publish.
+5. **Skill Details** — materials, difficulty, steps, source link + timestamps, start coaching.
+6. **Live Coach** — camera, step card, AI status, inference badge, warnings, pause / recheck /
+   next / previous.
+7. **Session Summary** — completed steps, corrections made, unresolved checks, user-confirmed
+   completion (never claim "mastery" from AI checks alone).
+8. **Settings** — Private / Hybrid mode, voice on/off, check interval.
 
-### M0 — Setup (Dev A, Nov 19) · `feature/firebase-setup`
-- Firebase project "SkillEcho": register app `com.hackathon.skillecho`, enable AI Logic with
-  Gemini Developer API, enable App Check (debug provider), download `google-services.json`
-  (each dev keeps a local copy — never commit).
-- Add google-services plugin + deps (versions from our doc, verify against the official
-  Android hybrid setup guide before pinning):
-  `firebase-ai:18.2.0`, `firebase-ai-ondevice:16.0.0-beta08`, `firebase-appcheck-debug:20.1.0`.
-- Add `domain/model/` classes above + empty `AppContainer` + Compose Navigation with 5 empty
-  routes (home, create, lesson, coach, summary).
-- Exit: app builds and runs; App Check debug token registered.
+## Steps
 
-### M1 — Prove Gemini Nano works (Dev A, Nov 19–20) · `feature/nano-checkpoint` ⚠️ highest risk
-- Check model availability, trigger download, show status.
+### Step 0 — Foundation (Dev A) · `feature/foundation`
+- Firebase project: register `com.hackathon.skillecho`, enable AI Logic (Gemini Developer API),
+  enable App Check with debug provider. Each dev keeps `google-services.json` locally.
+- Add Firebase BoM, AI Logic, on-device AI, App Check, Navigation Compose, CameraX, Room
+  (current official versions).
+- `domain/model/` classes, `AppContainer`, navigation graph with all screen routes.
+- **Design system:** theme (colors, type, shapes, dark mode), shared components
+  (buttons, step card, status chip, inference badge, loading/empty/error views).
+- Exit: app runs, navigates between placeholder screens in the final theme.
+
+### Step 1 — Prove Gemini Nano works (Dev A) · `feature/nano-checkpoint` ⚠️ highest risk
+- Model availability check, download with progress, status UI.
 - `CheckpointAnalyzer.check(bitmap, step): CheckResult` — one image + prompt, JSON output.
-- Debug screen: pick a photo → run check → show result + `inferenceSource`.
-- Test 3 photos: correct part, reversed part, blurry view.
-- Exit: on the real phone, source = ON_DEVICE and correct/reversed are told apart.
-- **If Nano fails by end of Nov 20:** simplify the test object (big color-coded blocks) and use
-  human-confirmed step progression. Do not sink more days into it.
+- Debug screen: pick photo → check → result + `inferenceSource`.
+- Test: correct part, reversed part, blurry view.
+- Exit: on the real phone, source = ON_DEVICE and correct vs reversed are told apart.
+- If Nano cannot do it reliably: simplify the training object (large color-coded blocks) and
+  use human-confirmed step progression. Don't sink more time than this step deserves.
 
-### M2 — Video → lesson (Dev B, Nov 20–23) · `feature/video-import`, `feature/lesson-review`
-- Create screen: pick local video (≤ ~10 MB, 2–5 min; inline limit is 20 MB incl. base64),
-  then YouTube URL, then in-app CameraX recording (same pipeline).
-- `SkillGenerator.generate(video): Skill` via cloud Gemini with JSON schema.
-- Lesson review screen: edit steps/expected visuals/common errors, then Save.
-- Room storage so lessons work offline. Home screen lists saved skills.
-- Exit: team-owned 2–3 min video → 5-step lesson saved and visible offline.
+### Step 2 — Video → lesson (Dev B) · `feature/video-import`
+- Create Skill screen with the three sources: local video first (keep files small — inline
+  request limit is 20 MB including base64), then YouTube URL, then CameraX recording.
+- `SkillGenerator.generate(source): Skill` via cloud Gemini with JSON response schema.
+- Exit: team-owned 2–5 min video → structured 5-step skill.
 
-### M3 — Live Coach (Dev A, Nov 21–25) · `feature/live-coach`
-- CameraX preview full screen + current step + AI status + inference badge.
-- `FrameSampler`: grab a frame every ~10 s (tune 8–15 s) only when no request is in flight.
-- Rules: `POSSIBLE_ERROR` must repeat on a second frame before speaking a warning; dedupe the
-  same warning; `UNCERTAIN` → "Show me a clearer view"; never auto-advance on one uncertain
-  result; manual Recheck / Next / Prev / Pause buttons.
+### Step 3 — Lesson review & storage (Dev B) · `feature/lesson-review`
+- Review Lesson editor, Skill Details, Home list.
+- Room persistence so saved skills work offline.
+- Exit: create → edit → save → reopen offline.
+
+### Step 4 — Live Coach (Dev A) · `feature/live-coach`
+- CameraX preview + step card + status + inference badge.
+- `FrameSampler`: one frame every ~8–15 s (tune on device), only when no request is in flight,
+  preferably when the image is stable.
+- Decision logic: `POSSIBLE_ERROR` must repeat on a second frame before a spoken warning;
+  dedupe repeated warnings; `UNCERTAIN` → "Show me a clearer view"; never auto-advance on one
+  uncertain result; manual Recheck / Next / Previous / Pause.
 - TextToSpeech for warnings and "Step verified".
-- Exit: offline (airplane mode), reversed part → spoken warning → fix → step verified.
+- Exit: in airplane mode, reversed part → spoken warning → fix → step verified.
 
-### M4 — Hybrid + privacy (Dev A, Nov 26) · `feature/hybrid-fallback`
-- Settings toggle Private / Hybrid; consent dialog before first cloud use.
-- Private mode + Nano unavailable → "Local AI unavailable", nothing uploaded.
-- "Detailed review" button (cloud) with consent.
+### Step 5 — Hybrid & privacy (Dev A) · `feature/hybrid-fallback`
+- Settings: Private / Hybrid; consent dialog; "Detailed review" in cloud.
+- Clear handling for: Nano not supported, model downloading, quota hit, no network.
 
-### M5 — Integration & polish (both, Nov 26–28) · small `fix/*` branches
-- Dev B: Summary screen (completed steps, corrections, unresolved checks), Firestore sync +
-  anonymous Auth (optional), onboarding, empty/error states, consistent theme.
-- Dev A: permissions, crash fixes, camera framing tips, performance.
-- Both: run the full flow 5× on the real phone; fix anything that breaks.
+### Step 6 — Summary, onboarding, sync (Dev B) · `feature/summary-onboarding`
+- Session Summary, Onboarding, Settings screen UI.
+- Anonymous Auth + Firestore sync of skills (optional Remote Config for check interval).
 
-### M6 — Submission (Nov 29) · `docs/submission`
-- README: value proposition, how we use Firebase AI Logic (with file links), setup steps
-  (create Firebase project, add own `google-services.json`, App Check debug token), test steps.
-- Signed/debug APK in GitHub Releases. Set LICENSE visible in repo About.
+### Step 7 — Polish pass (both) · small `fix/*` and `design/*` branches
+- Walk every screen in light/dark, small/large font, TalkBack; fix anything that looks unfinished.
+- Animations and transitions, haptics on warnings, final app icon and splash.
+- Run the full flow (import → review → coach → summary) many times on the real phone; fix
+  every crash, wrong warning, permission and framing issue.
+
+### Step 8 — Submission (both) · `docs/submission`
+- README: value proposition, screenshots, how we use Firebase AI Logic (with file links),
+  setup (own Firebase project + `google-services.json`, App Check debug token), test steps.
+- APK in GitHub Releases; LICENSE visible in repo About.
 - Record demo (script below), upload public to YouTube, fill Devpost, add both members.
-- Nov 30 morning = buffer only. Submit before noon PT.
 
 ## Demo script (≤ 3:00)
-0:00 problem → 0:20 import team-owned video (show YouTube/record options) → 0:45 cloud Gemini
-builds 5 steps → 1:05 start Live Coach, turn internet off → 1:30 Nano catches reversed part,
-spoken warning → 2:00 fix, checkpoint verified → 2:20 show ON_DEVICE badge, then cloud fallback
-with consent → 2:40 finish + pitch. Only real model output on screen.
+Problem → import team-owned video (show YouTube/record options) → cloud Gemini builds the skill →
+start Live Coach, turn internet off → Nano catches a reversed part, spoken warning → learner fixes
+it, checkpoint verified → show ON-DEVICE badge, then cloud fallback with consent → finish,
+summary, pitch. Only real model output on screen.
 
-## Day-by-day
-| Date | Dev A (Claude Code + Codex) | Dev B (Codex) |
-|---|---|---|
-| Nov 19 | M0 setup, start M1 | Read docs, design screens, Room + models after M0 merge |
-| Nov 20 | M1 Nano proof (go/no-go) | M2 local video → cloud lesson |
-| Nov 21–23 | M3 Live Coach | M2 lesson review, Room, Home, YouTube, recording |
-| Nov 24–25 | M3 finish (TTS, dedupe, offline) | Summary screen, Firestore/Auth, UI polish |
-| Nov 26 | M4 hybrid + privacy | Integrate lesson → coach → summary flow |
-| Nov 27–28 | Test + fix | Test + fix |
-| Nov 29 | Demo recording, APK | README, Devpost text |
-| Nov 30 | Buffer, submit before 2 PM PT | Buffer |
-
-## Compliance checklist (tick before submitting)
+## Compliance checklist
 - [ ] Firebase AI Logic imported and called (cloud + on-device)
 - [ ] Real Gemini Nano inference shown on a supported phone
 - [ ] Consent-based cloud fallback works
@@ -132,6 +178,6 @@ with consent → 2:40 finish + pitch. Only real model output on screen.
 - [ ] README with setup + test instructions, no secrets
 - [ ] Public YouTube demo ≤ 3 min
 - [ ] Test APK available free for judges
-- [ ] Rights to every video/asset used (use team-owned videos in the demo)
+- [ ] Rights to every video/asset used (team-owned videos in the demo)
 - [ ] Both members on Devpost project
-- [ ] Submitted before Nov 30, 2:00 PM PT
+- [ ] Submitted before the contest deadline

@@ -7,7 +7,7 @@ Then read `docs/PLAN.md` (what to build) and `docs/HANDOFF.md` (where we are now
 Android app (Kotlin + Jetpack Compose) for the Firebase #BuildHybridAI 2026 hackathon.
 Cloud Gemini turns an instructional video into step checkpoints; Gemini Nano 4 watches the
 learner through the camera (on-device, works offline) and warns about mistakes.
-**Deadline: Nov 30, 2026, 2:00 PM Pacific. Nothing new after Nov 29 evening.**
+Goal: a premium-looking, fully working product — not a prototype. See "Quality bar" in `docs/PLAN.md`.
 
 ## Hard rules (never break)
 1. **All AI calls go through Firebase AI Logic** (`com.google.firebase:firebase-ai` + the
@@ -21,9 +21,14 @@ learner through the camera (on-device, works offline) and warns about mistakes.
 5. **App must build before every commit**: `./gradlew :app:assembleDebug` (Windows:
    `.\gradlew.bat :app:assembleDebug`). Run `testDebugUnitTest` if you touched logic with tests.
 6. **English only** in UI strings, code, commits, and docs. UI strings go in `strings.xml`.
-7. **Pin versions.** Do not bump Firebase / AGP / Kotlin / Compose versions without both devs
-   agreeing. The on-device AI SDK is experimental — upgrades can break it.
-8. Only change files your task needs. Do not rewrite or "clean up" another person's area.
+7. **Versions come from official docs, then get pinned.** When adding a library, use the current
+   stable version from the official Firebase / Android docs (Firebase via the BoM). Never copy
+   versions from the idea PDF. Once it works, don't bump without both devs agreeing.
+8. **Design is a deliverable.** Use the shared theme and components in `ui/theme` and
+   `ui/components`; no hardcoded colors/sizes in screens. Every screen ships with loading,
+   empty, error, and success states, dark mode, and accessibility (content descriptions,
+   48dp targets). A screen that only works but looks unfinished is not done.
+9. Only change files your task needs. Do not rewrite or "clean up" another person's area.
 
 ## Git workflow (mandatory)
 - `master` = always working, demo-able code. **Nobody (human or agent) commits or pushes
@@ -52,7 +57,7 @@ learner through the camera (on-device, works offline) and warns about mistakes.
 |---|---|---|
 | On-device AI, Live Coach, camera, TTS | **Dev A** (Claude Code + Codex) | `data/ai/CheckpointAnalyzer.kt`, `data/ai/InferenceRouter.kt`, `data/camera/`, `ui/coach/` |
 | Video import, lesson generation, storage, Home/Lesson/Summary screens | **Dev B** (Codex) | `data/ai/SkillGenerator.kt`, `data/local/`, `data/firebase/`, `ui/home/`, `ui/create/`, `ui/lesson/`, `ui/summary/` |
-| Shared (change only by agreement, small PRs) | both | `domain/model/`, `navigation/`, `MainActivity.kt`, `app/build.gradle.kts`, `gradle/libs.versions.toml`, `AndroidManifest.xml` |
+| Shared (change only by agreement, small PRs) | both | `ui/theme/`, `ui/components/`, `domain/model/`, `navigation/`, `MainActivity.kt`, `app/build.gradle.kts`, `gradle/libs.versions.toml`, `AndroidManifest.xml` |
 
 If you must touch a shared file, keep that change in its own small commit and mention it in
 the PR description and `docs/HANDOFF.md`.
